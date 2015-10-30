@@ -14,8 +14,7 @@ function status(text)
 		write(text)
 	end
 end
-<<<<<<< HEAD
-<<<<<<< HEAD
+
 local function notX(x)
 	print()
 	printError("ERROR: Failed to "..x..". Reinstall system (Y/n)?")
@@ -26,10 +25,6 @@ local function notX(x)
 		-- TODO reinstall system
 	end
 end
-=======
->>>>>>> e849c09b1d4a79c719cc2303919e6358a057c60c
-=======
->>>>>>> e849c09b1d4a79c719cc2303919e6358a057c60c
 
 clear()
 write("This is CCGnu Core.")
@@ -37,8 +32,6 @@ status("Starting package manager grin-get...")
 shell.run("/grin/bin/grin-startup.lua")
 status("Checking for core apis...")
 if fs.exists("/lib/core/") and fs.isDir("/lib/core") then
-<<<<<<< HEAD
-<<<<<<< HEAD
 		status("Loading ccgnu...")
 		if fs.exists("/lib/core/CCGnu.lua") then
 			os.loadAPI("/lib/core/CCGnu.lua")
@@ -47,22 +40,4 @@ if fs.exists("/lib/core/") and fs.isDir("/lib/core") then
 		end
 else
 	notX("find core api directory")
-=======
-=======
->>>>>>> e849c09b1d4a79c719cc2303919e6358a057c60c
-		write(" Api dir finded. Loading main api...")
-
-else
-	print()
-	printError("ERROR: Failed to find core api dir. Reinstall system (Y/n)?")
-	local event, key = os.pullEvent("key")
-	if key == keys.n then
-			error("Exiting...", 0)
-	else
-		-- TODO reinstall system
-	end
-<<<<<<< HEAD
->>>>>>> e849c09b1d4a79c719cc2303919e6358a057c60c
-=======
->>>>>>> e849c09b1d4a79c719cc2303919e6358a057c60c
 end
