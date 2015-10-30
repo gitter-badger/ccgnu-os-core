@@ -1,0 +1,28 @@
+local grinDir = shell.resolve("/"..fs.combine(fs.getDir(shell.getRunningProgram()), ".."))
+
+local function run(program, ...)
+    shell.run(fs.combine(grinDir.."/bin", program), ...)
+end
+
+run("grin-startup.lua")
+
+local argparse = grin.getPackageAPI("Team-CC-Corp/Grin", "argparse")
+local commandParser = argparse.new()
+commandParser
+    :argument"command"
+commandParser
+    :argument"commandArgs"
+    :count"*"
+
+local options = commandParser:parse({commandArgs={}}, ...)
+if not options then
+    return
+end
+
+if options.command == "install" then
+    run("grin-install.lua", unpack(options.commandArgs))
+elseif options.command == "remove" then
+    run("grin-remove.lua", unpack(options.commandArgs))
+else
+    error("Usage: grin-get <command> ...", 0)
+end

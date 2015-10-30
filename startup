@@ -1,0 +1,59 @@
+local function clear()
+  if term.isColor and term.isColor() then
+    term.setBackgroundColor(colors.black)
+	term.setTextColor(colors.white)
+  end
+  term.clear()
+  term.setCursorPos(1, 1)
+end
+function status(text)
+	term.clearLine()
+	local _, y = term.getCursorPos()
+	term.setCursorPos(1, y)
+	if text then
+		write(text)
+	end
+end
+<<<<<<< HEAD
+local function notX(x)
+	print()
+	printError("ERROR: Failed to "..x..". Reinstall system (Y/n)?")
+	local event, key = os.pullEvent("key")
+	if key == keys.n then
+			error("Exiting...", 0)
+	else
+		-- TODO reinstall system
+	end
+end
+=======
+>>>>>>> e849c09b1d4a79c719cc2303919e6358a057c60c
+
+clear()
+write("This is CCGnu Core.")
+status("Starting package manager grin-get...")
+shell.run("/grin/bin/grin-startup.lua")
+status("Checking for core apis...")
+if fs.exists("/lib/core/") and fs.isDir("/lib/core") then
+<<<<<<< HEAD
+		status("Loading ccgnu...")
+		if fs.exists("/lib/core/CCGnu.lua") then
+			os.loadAPI("/lib/core/CCGnu.lua")
+		else
+			notX("find ccgnu")
+		end
+else
+	notX("find core api directory")
+=======
+		write(" Api dir finded. Loading main api...")
+
+else
+	print()
+	printError("ERROR: Failed to find core api dir. Reinstall system (Y/n)?")
+	local event, key = os.pullEvent("key")
+	if key == keys.n then
+			error("Exiting...", 0)
+	else
+		-- TODO reinstall system
+	end
+>>>>>>> e849c09b1d4a79c719cc2303919e6358a057c60c
+end
