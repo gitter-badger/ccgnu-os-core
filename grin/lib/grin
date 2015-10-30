@@ -1,0 +1,344 @@
+PASTEBIN_CODE = "VuBNx3va"
+
+function combine(path, ...)
+    if not path then
+        return ""
+    end
+
+    expect("string", path)
+    return fs.combine(path, combine(...))
+end
+
+function assert(condition, errMsg, level)
+    if condition then return condition end
+    if type(level) ~= "number" then
+        level = 2
+    elseif level <= 0 then
+        level = 0
+    else
+        level = level + 1
+    end
+    error(errMsg or "Assertion failed!", level)
+end
+
+function expect(t, v)
+    assert(type(v) == t, "Expected " .. t .. " got " .. type(v), 3)
+end
+
+local grinDir
+function setGrinDir(dir)
+    assert(fs.isDir(dir), "Expected directory", 2)
+    grinDir = dir
+end
+function getGrinDir()
+    return grinDir
+end
+
+function packageNameComponents(pkg)
+    expect("string", pkg)
+    local user, repo, tag
+    if pkg:find("([^/%s]+)/([^/%s]+)/([^/%s]+)") then
+        _,_, user, repo, tag = pkg:find("([^/%s]+)/([^/%s]+)/([^/%s]+)")
+    else
+        _,_, user, repo = pkg:find("([^/%s]+)/([^/%s]+)")
+        tag = getLatestInstalledVersion(pkg)
+    end
+    return user, repo, tag
+end
+
+function refreshPath(shell)
+    expect("table", shell)
+    local grinPath = "/"..combine(grinDir, "bin")
+
+    local oldPath = shell.path()
+    oldPath:gsub(":"..grinDir.."[^:]*", "")
+
+    local path = {oldPath, grinPath}
+
+    forEach(function(pkg)
+        local pathItems = getPackagePathItems(pkg)
+        for i,v in ipairs(pathItems) do
+            table.insert(path, v)
+        end
+    end)
+
+    shell.setPath(table.concat(path, ":"))
+end
+
+function refreshHelpPath()
+    local grinPath = "/"..combine(grinDir, "help")
+
+    local oldPath = help.path()
+    oldPath:gsub(":"..grinDir.."[^:]*", "")
+
+    local path = {oldPath, grinPath}
+
+    forEach(function(pkg)
+        local pathItems = getPackageHelpItems(pkg)
+        for i,v in ipairs(pathItems) do
+            table.insert(path, v)
+        end
+    end)
+
+    help.setPath(table.concat(path, ":"))
+end
+
+function resolvePackageRoot(pkg)
+    expect("string", pkg)
+    local fullPkg = combine(packageNameComponents(pkg))
+    return combine(grinDir, "packages", fullPkg)
+end
+
+function getPackagePathItems(pkg)
+    expect("string", pkg)
+    local path = {}
+
+    local dir = resolvePackageRoot(pkg)
+    local packageGrinJSON = getPackageGrinJSON(pkg)
+    if packageGrinJSON then
+        if type(packageGrinJSON.bin) == "string" then
+            for v in packageGrinJSON.bin:gmatch("[^:]+") do
+                table.insert(path, "/"..combine(dir, v))
+            end
+        elseif type(packageGrinJSON.bin) == "table" then
+            for i,v in ipairs(packageGrinJSON.bin) do
+                table.insert(path, "/"..combine(dir, v))
+            end
+        end
+    else
+        local bin = "/"..combine(dir, "bin")
+        if fs.exists(bin) then
+            table.insert(path, bin)
+        else
+            table.insert(path, dir)
+        end
+    end
+
+    return path
+end
+
+function getPackageHelpItems(pkg)
+    expect("string", pkg)
+    local path = {}
+
+    local dir = resolvePackageRoot(pkg)
+    local packageGrinJSON = getPackageGrinJSON(pkg)
+    if packageGrinJSON then
+        if type(packageGrinJSON.help) == "string" then
+            for v in packageGrinJSON.help:gmatch("[^:]+") do
+                table.insert(path, "/"..combine(dir, v))
+            end
+        elseif type(packageGrinJSON.help) == "table" then
+            for i,v in ipairs(packageGrinJSON.help) do
+                table.insert(path, "/"..combine(dir, v))
+            end
+        end
+    else
+        local help = "/"..combine(dir, "help")
+        if fs.exists(help) then
+            table.insert(path, help)
+        end
+    end
+
+    return path
+end
+
+function getPackageLibItems(pkg)
+    expect("string", pkg)
+    local libs = {}
+
+    local dir = resolvePackageRoot(pkg)
+    local packageGrinJSON = getPackageGrinJSON(pkg)
+    if packageGrinJSON then
+        if type(packageGrinJSON.lib) == "string" then
+            for v in packageGrinJSON.lib:gmatch("[^:]+") do
+                table.insert(libs, "/"..combine(dir, v))
+            end
+        elseif type(packageGrinJSON.lib) == "table" then
+            for i,v in ipairs(packageGrinJSON.lib) do
+                table.insert(libs, "/"..combine(dir, v))
+            end
+        end
+    else
+        local lib = "/"..combine(dir, "lib")
+        if fs.exists(lib) then
+            table.insert(libs, lib)
+        else
+            table.insert(libs, dir)
+        end
+    end
+
+    return libs
+end
+
+function resolveInPackage(pkg, path)
+    expect("string", pkg)
+    expect("string", path)
+    for i,v in ipairs(getPackagePathItems(pkg)) do
+        if fs.exists(combine(v, path)) then
+            return combine(v, path)
+        end
+    end
+end
+
+function getFromPackage(pkg, path)
+    expect("string", pkg)
+    expect("string", path)
+    local dir = resolvePackageRoot(pkg)
+    return combine(dir, path)
+end
+
+function getPackageGrinJSON(pkg)
+    expect("string", pkg)
+    local grinJSONPath = getFromPackage(pkg, "grin.json")
+    if fs.exists(grinJSONPath) then
+        return json.decodeFromFile(grinJSONPath)
+    end
+end
+
+function getReleaseInfo(pkg)
+    expect("string", pkg)
+
+    if pkg:find("([^/%s]+)/([^/%s]+)/([^/%s]+)") then
+        local user, repo = pkg:find("([^/%s]+)/([^/%s]+)/([^/%s]+)")
+        pkg = combine(user, repo)
+    end
+
+    local packageDir = combine(grinDir, "packages", pkg)
+    if not fs.exists(packageDir) then
+        return getReleaseInfoFromGithub(pkg)
+    end
+
+    local jsonFh = assert(fs.open(combine(packageDir, "releases.json"), "r"), pkg.." releases.json not found", 2)
+    local jsonData = json.decode(jsonFh.readAll())
+
+    return jsonData
+end
+
+function getReleaseInfoFromGithub(pkg)
+    expect("string", pkg)
+    local _,_, user, repo = pkg:find("^([^/%s]+)/([^/%s]+)$")
+    assert(user and repo, "Invalid package name "..pkg, 2)
+    local githubApiResponse = assert(http.get("https://api.github.com/repos/"..user.."/"..repo.."/releases"))
+    assert(githubApiResponse.getResponseCode() == 200, "Failed github response", 2)
+    local jsonStr = githubApiResponse.readAll()
+    local jsonFh = fs.open(combine(grinDir, "packages", user, repo, "releases.json"), "w")
+    jsonFh.write(jsonStr)
+    jsonFh.close()
+    return json.decode(jsonStr)
+end
+
+function getLatestInstalledVersion(pkg)
+    expect("string", pkg)
+
+    local _,_, user, repo = pkg:find("^([^/]+)/([^/]+)$")
+    assert(user and repo, "Invalid package name: " .. pkg)
+    local packageDir = combine(grinDir, "packages", user, repo)
+
+    if fs.isDir(combine(packageDir, "dev")) then
+        return "dev"
+    end
+
+    local jsonData = getReleaseInfo(pkg)
+    for i,v in ipairs(jsonData) do
+        if fs.isDir(combine(packageDir, v.tag_name)) then
+            return v.tag_name
+        end
+    end
+end
+
+function forEach(func)
+    expect("function", func)
+    local packagesDir = combine(grinDir, "packages")
+    for i,user in ipairs(fs.list(packagesDir)) do
+        local userDir = combine(packagesDir, user)
+        if fs.isDir(userDir) then
+            for i2,package in ipairs(fs.list(userDir)) do
+                local pkgDir = combine(userDir, package)
+                if fs.isDir(pkgDir) then
+                    func(combine(user, package), pkgDir)
+                end
+            end
+        end
+    end
+end
+
+function isPackageInstalled(pkg)
+    expect("string", pkg)
+    local user, repo, tag = packageNameComponents(pkg)
+    if not tag then
+        return false
+    else
+        return fs.isDir(combine(grinDir, "packages", user, repo, tag))
+    end
+end
+
+function packageFromExecutable(path)
+    expect("string", path)
+    local _,_, package = path:find("^"..grinDir.."/packages/([^/]+/[^/]+/[^/]+)/")
+    return package
+end
+
+local packageAPIs = {}
+function getPackageAPI(pkg, name)
+    expect("string", pkg)
+    expect("string", name)
+    local fullPkg = combine(packageNameComponents(pkg))
+    local packageAPIName = combine(fullPkg, name)
+    if packageAPIs[packageAPIName] then
+        return packageAPIs[packageAPIName]
+    end
+
+    local libPath = getPackageLibItems(pkg, version)
+    for i,v in ipairs(libPath) do
+        local path = combine(v, name)
+        if fs.exists(path..".lua") then
+            path = path..".lua"
+        end
+
+        if fs.exists(path) then
+            if os.loadAPI(path) then
+                return packageAPIs[packageAPIName]
+            else
+                return false
+            end
+        end
+    end
+end
+
+local tAPIsLoading = {}
+function os.loadAPI(path)
+    expect("string", path)
+    local sName = fs.getName(path):gsub("%.lua$", "")
+    local _,_, pkg = path:find("^/?"..combine(grinDir, "packages").."/([^/]+/[^/]+/[^/]+)/.+")
+
+
+    if tAPIsLoading[sName] == true then
+        printError( "API "..sName.." is already being loaded" )
+        return false
+    end
+    tAPIsLoading[sName] = true
+        
+    local tEnv = {}
+    if pkg then
+        tEnv.__package = pkg
+    end
+    
+    if not os.run(tEnv, path) then
+        tAPIsLoading[sName] = nil
+        return false
+    end
+    
+    local tAPI = {}
+    for k,v in pairs( tEnv ) do
+        tAPI[k] =  v
+    end
+    
+    _G[sName] = tAPI    
+    tAPIsLoading[sName] = nil
+
+    if pkg then
+        packageAPIs[combine(pkg, sName)] = tAPI
+    end
+    return true
+end

@@ -1,0 +1,8 @@
+{
+  history = {
+    "ls",
+    "quit",
+    "exit",
+  },
+  dir = "",
+}
