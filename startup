@@ -42,4 +42,11 @@ else
 end
 status("Starting extensions...")
 if not shell.run("extensions") then notX("load extensions") end
-status("All done!")
+status("Modifying os.version()")
+function os.version()
+	return CCGnu.version_long
+end
+status("All done! Starting clam...")
+print("")
+sleep(1)
+shell.run("clam.lua")
