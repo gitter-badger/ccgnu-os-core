@@ -14,12 +14,11 @@ function status(text)
 		write(text)
 	end
 end
-
 local function notX(x)
 	print()
 	printError("ERROR: Failed to "..x..". Reinstall system (Y/n)?")
 	local event, key = os.pullEvent("key")
-	if key == keys.n then
+	if key == 49 then
 			error("Exiting...", 0)
 	else
 		-- TODO reinstall system
@@ -34,10 +33,13 @@ status("Checking for core apis...")
 if fs.exists("/lib/core/") and fs.isDir("/lib/core") then
 		status("Loading ccgnu...")
 		if fs.exists("/lib/core/CCGnu.lua") then
-			os.loadAPI("/lib/core/CCGnu.lua")
+			if not os.loadAPI("/lib/core/CCGnu.lua") then notX("load CCGnu api") end
 		else
 			notX("find ccgnu")
 		end
 else
 	notX("find core api directory")
 end
+status("Starting extensions...")
+if not shell.run("extensions") then notX("load extensions") end
+status("All done!")

@@ -1,0 +1,110 @@
+-- Extensions v2 by KnightMiner
+-- Check if we are loading as an API or running the startup
+if not shell then
+  -- Load the list of extensions
+  local file = fs.open( "extensions.cfg", "r" )
+  list = textutils.unserialize( file.readAll() )
+  file.close()
+  
+  -- Function to check if a program is a file and what to run it with
+  function program( name )
+    return list[string.match( name, "^[^ ]*%.([^. ]+)" )]
+  end
+else
+  -- validate args
+  local args = { ... }
+  if #args > 2 or args[1] == "usage" then
+    print( "Usage: extensions [option] [option2]" )
+  end
+
+  -- Check for an extensions configuration file
+  -- If it does not exist, ask to create it
+  if not fs.exists( "extensions.cfg" ) then
+    function create()
+      --print( "Creating extension.cfg" )
+      local file = fs.open( "extensions.cfg", "w" )
+      file.write( '{\n  -- Lua table containing file extensions\n  cfg = "edit"\n}' )
+      file.close()
+      shell.run( "edit extensions.cfg" )
+    end
+    if args[1] == "create" then
+      create()
+    elseif args[1] == "skip" then
+      print( "Missing extensions.cfg file, canceling" )
+      return
+    else
+      print( "Missing extensions.cfg file, create it? (y/n)" )
+      while true do
+        local _, key = os.pullEvent( "key" )
+        -- remove any stray character events
+        os.startTimer(0.1)
+        os.pullEvent()
+        if key == keys.y then
+          create()
+          break
+        elseif key == keys.n then
+          print( "Canceling extension loading" )
+          return
+        end
+      end
+    end
+  end
+
+  -- Check to see if we already ran the extension program
+  -- And if so, ask if we should reload
+  if extensions then
+    if ( args[2] or args[1] ) == "load" then
+      print( "Extensions already loaded, canceling" )
+      return
+    elseif ( args[2] or args[1] ) == "reload" then
+      print( "Reloading extension support" )
+    else
+      print( "Extensions already loaded, reload them? (y/n)" )
+      while true do
+        local _, key = os.pullEvent( "key" )
+        -- remove any stray character events
+        os.startTimer(0.1)
+        os.pullEvent()
+        if key == keys.y then
+          print( "Reloading extension support" )
+          break
+        elseif key == keys.n then
+          print( "Canceling extension reloading" )
+          return
+        end
+      end
+    end
+    os.unloadAPI( "extensions" )
+  else
+    -- Preserve the original method of running
+    --print( "Loading extension support" )
+    shell.runRaw = shell.run
+  end
+
+  os.loadAPI( "extensions" )
+  if not extensions.list then
+    print "Error loading extensions"
+    return
+  end
+
+  -- Override the shell.run function, so extensions run is used by default
+  shell.run = function( name, ... )
+    local program = extensions.program( name )
+    if program then
+      if fs.exists( name ) then
+        return shell.runRaw( program, name )
+      else
+        if term.isColor() then
+          term.setTextColor( colors.red )
+        end
+        print( "No such file" )
+        term.setTextColor( colors.white )
+        return false
+      end
+    else
+      return shell.runRaw( name, ... )
+    end
+  end
+
+  --print( "Extensions successfully loaded" )
+end
