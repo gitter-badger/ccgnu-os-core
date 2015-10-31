@@ -16,17 +16,24 @@ function status(text)
 end
 local function notX(x)
 	print()
-	printError("ERROR: Failed to "..x..". Reinstall system (Y/n)?")
+	write("ERROR: Failed to "..x..". Reinstall system (Y/n)?")
 	local event, key = os.pullEvent("key")
 	if key == 49 then
+			print(" n")	
 			error("Exiting...", 0)
 	else
+		print(" "keys.getName(key))
 		-- TODO reinstall system
+		error("This is not ready, sorry!", 0)
 	end
 end
 
+if CCGnu then
+	notX("load os: is already loaded")
+end
+
 clear()
-write("This is CCGnu Core.")
+print("This is CCGnu Core.")
 status("Starting package manager grin-get...")
 shell.run("/grin/bin/grin-startup.lua")
 status("Checking for core apis...")
@@ -36,6 +43,11 @@ if fs.exists("/lib/core/") and fs.isDir("/lib/core") then
 			if not os.loadAPI("/lib/core/CCGnu.lua") then notX("load CCGnu api") end
 		else
 			notX("find ccgnu")
+		end
+		if fs.exists("/lib/core/config.lua") then
+			if not os.loadAPI("/lib/core/config.lua") then notX("load config api") end
+		else
+			notX("find config api")
 		end
 else
 	notX("find core api directory")
